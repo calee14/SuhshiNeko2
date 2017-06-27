@@ -9,81 +9,236 @@
 import SpriteKit
 import GameplayKit
 
+enum Side {
+    case left, none, right
+}
+
+//Tracking gameState
+enum GameState {
+    case title, ready, playing, gameOver
+}
+
+
 class GameScene: SKScene {
     
-    private var label : SKLabelNode?
-    private var spinnyNode : SKShapeNode?
+    //Game objects
+    var sushiBasePiece: SushiPiece!
+    //Set reference to the character
+    var character: Character!
+    //Sushie tower array
+    var sushiTower: [SushiPiece] = []
+    //game management
+    var state: GameState = .title
+    //play button
+    var playButton: MSButtonNode!
+    //HealthBar
+    var healthBar: SKSpriteNode!
+    //ScoreLabel
+    var scoreLabel: SKLabelNode!
+    
+    var health: CGFloat = 1.0 {
+        didSet {
+            //Scale healthbar between 0.0 -> 1.0 e.g. 0 < 100
+            if health > 1.0 { health = 1.0 }
+            
+            healthBar.xScale = health
+        }
+    }
+    
+    var score: Int = 0 {
+        didSet {
+            scoreLabel.text = String(score)
+        }
+    }
     
     override func didMove(to view: SKView) {
+        super.didMove(to: view)
         
-        // Get label node from scene and store it for use later
-        self.label = self.childNode(withName: "//helloLabel") as? SKLabelNode
-        if let label = self.label {
-            label.alpha = 0.0
-            label.run(SKAction.fadeIn(withDuration: 2.0))
-        }
+        //connect the sushi base pieces
+        sushiBasePiece = self.childNode(withName: "sushiBasePiece") as! SushiPiece
         
-        // Create shape node to use during mouse interaction
-        let w = (self.size.width + self.size.height) * 0.05
-        self.spinnyNode = SKShapeNode.init(rectOf: CGSize.init(width: w, height: w), cornerRadius: w * 0.3)
+        //Connect game objects
+        character = self.childNode(withName: "character") as! Character
+        healthBar = self.childNode(withName: "healthBar") as! SKSpriteNode
+        //UI connections
+        playButton = self.childNode(withName: "buttonPlay") as! MSButtonNode
+        scoreLabel = self.childNode(withName: "scoreLabel") as! SKLabelNode
         
-        if let spinnyNode = self.spinnyNode {
-            spinnyNode.lineWidth = 2.5
-            
-            spinnyNode.run(SKAction.repeatForever(SKAction.rotate(byAngle: CGFloat(Double.pi), duration: 1)))
-            spinnyNode.run(SKAction.sequence([SKAction.wait(forDuration: 0.5),
-                                              SKAction.fadeOut(withDuration: 0.5),
-                                              SKAction.removeFromParent()]))
-        }
+        state = .ready
+        
+        sushiBasePiece.connectChopsticks()
+        
+        addTowerPiece(side: .none)
+        addTowerPiece(side: .right)
+        addRandomPieces(total: 10)
+        
     }
-    
-    
-    func touchDown(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.green
-            self.addChild(n)
-        }
-    }
-    
-    func touchMoved(toPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.blue
-            self.addChild(n)
-        }
-    }
-    
-    func touchUp(atPoint pos : CGPoint) {
-        if let n = self.spinnyNode?.copy() as! SKShapeNode? {
-            n.position = pos
-            n.strokeColor = SKColor.red
-            self.addChild(n)
-        }
-    }
-    
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        if let label = self.label {
-            label.run(SKAction.init(named: "Pulse")!, withKey: "fadeInOut")
+        //Called when touches begins
+        
+        //Disabling touch if game is not playing
+        if state == .gameOver || state == .title { return }
+        
+        if state == .ready {
+            state = .playing
         }
         
-        for t in touches { self.touchDown(atPoint: t.location(in: self)) }
+        //Find the first touch
+        let touch = touches.first!
+        
+        //Find the location of the touch in the scene
+        let location = touch.location(in: self)
+        
+        //Was the touch left or right 
+        if location.x > size.width / 2 {
+            //if the touch was on the right side
+            character.side = .right
+        } else {
+            //if the touch was on the left side
+            character.side = .left
+        }
+        
+        //Grab the sushi above the sushibase it will always be first
+        if let firstPiece = sushiTower.first {
+            
+            //Check if the character side is the same as the sushi
+            if character.side == firstPiece.side {
+                
+                gameOver()
+                
+                //no need to run the rest of the code 
+                return
+            }
+            
+            health += 0.1
+            score += 1
+            
+            //remove from sushi tower array
+            sushiTower.removeFirst()
+            firstPiece.flip(character.side)
+            
+            //Add a new sushi piece to the top of the sushi tower
+            addRandomPieces(total: 1)
+        }
     }
-    
-    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchMoved(toPoint: t.location(in: self)) }
-    }
-    
-    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
-    }
-    
-    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
-        for t in touches { self.touchUp(atPoint: t.location(in: self)) }
-    }
-    
     
     override func update(_ currentTime: TimeInterval) {
         // Called before each frame is rendered
+        if state != .playing {
+            return
+        }
+        //Decrease health
+        health -= 0.01
+        //has the player ran out of health
+        if health < 0 {
+            gameOver()
+        }
+        moveTowerDown()
+    }
+    
+    func addRandomPieces(total: Int) {
+        //Add random piece to the sushi tower
+        
+        for _ in 1...total {
+            
+            //Need to access the last piece properties 
+            let lastPiece = sushiTower.last!
+            
+            //Need to ensure we don't create impossible sushi structures
+            if lastPiece.side != .none  {
+                addTowerPiece(side: .none)
+            } else {
+                
+                //Random number generator TODO: it could be the random num that could be affect the no sushi
+                let rand = arc4random_uniform(100)
+                
+                if rand < 45 {
+                    //45% chance of getting a left piece
+                    addTowerPiece(side: .left)
+                } else if rand < 90 {
+                    //45% chance of getting a right peice
+                    addTowerPiece(side: .right)
+                } else {
+                    //10% chance of getting a sushi with none
+                    addTowerPiece(side: .none)
+                }
+            }
+        }
+    }
+    
+    func addTowerPiece(side: Side) {
+        //Add a new sushiPiece to the sushi tower
+        
+        //Copy original sushi piece 
+        let newPiece  = sushiBasePiece.copy() as! SushiPiece
+        newPiece.connectChopsticks()
+        
+        //Access the last piece properties
+        let lastPiece = sushiTower.last
+        
+        //Add on top of the last piece of the tower array, default first piece
+        let lastPosition = lastPiece?.position ?? sushiBasePiece.position
+        newPiece.position.x = lastPosition.x
+        newPiece.position.y = lastPosition.y + 55
+        
+        //increment Z to ensure it's on top of the of the last piece, default on the first piece
+        let lastZPosition = lastPiece?.zPosition ?? sushiBasePiece.zPosition
+        newPiece.zPosition = lastZPosition + 1
+        
+        //Set side
+        newPiece.side = side
+        
+        //Add the child to the scene TODO: check if adding the child can affect the apending to the array
+        addChild(newPiece)
+        
+        //Add sushi piece the sushi tower
+        sushiTower.append(newPiece)
+    }
+    
+    func gameOver() {
+        //Game over
+        state = .gameOver
+        
+        //Turn all the sushi peices red
+        for sushi in sushiTower {
+            sushi.run(SKAction.colorize(with: UIColor.red, colorBlendFactor: 1.0, duration: 0.5))
+        }
+        
+        //make the base turn red
+        sushiBasePiece.run(SKAction.colorize(with: UIColor.red, colorBlendFactor: 1.0, duration: 0.5))
+        
+        //Make the playa red
+        character.run(SKAction.colorize(with: UIColor.red, colorBlendFactor: 1.0, duration: 0.5))
+        
+        //Change the play button selection handler
+        playButton.selectedHandler = {
+            
+            //Grab reference to the skView
+            let skView = self.view as SKView!
+            
+            //Load Game Scene 
+            guard let scene = GameScene(fileNamed: "GameScene") as GameScene! else {
+                return
+            }
+            
+            //Enure correct aspectmode
+            scene.scaleMode = .aspectFill
+            
+            //Restart GameScene
+            skView?.presentScene(scene)
+            
+        }
+    }
+    
+    func moveTowerDown() {
+        var n: CGFloat = 0
+        //loop through the shushi pieces in the array 55 times which is height of array
+        for piece in sushiTower {
+            print(n)
+            //Instead of moving directly we move 50% of the distance
+            let y = (n * 55) + 215
+            piece.position.y -= (piece.position.y - y) * 0.5
+            n += 1
+        }
     }
 }
