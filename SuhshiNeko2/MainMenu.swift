@@ -44,7 +44,7 @@ class MainMenu: SKScene {
     }
     
     override func update(_ currentTime: TimeInterval) {
-        if timer > 0.5 {
+        if timer > 1.5 {
         let action = SKAction.run({
         let forePiece = self.sushiTower[1]
             if forePiece.side == self.character.side {

@@ -142,20 +142,20 @@ class GameScene: SKScene {
             gameText.alpha += 0.05
             overText.alpha += 0.05
             playAgain.alpha += 0.05
+
         }
         
         if state != .playing {
             return
         }
         //Decrease health
-        health -= 0.01
+        health -= 0.009
         
         //has the player ran out of health
         if health < 0 {
             gameOver()
         }
         
-        //Ease in the
         moveTowerDown()
     }
     
@@ -221,6 +221,18 @@ class GameScene: SKScene {
     func gameOver() {
         //Game over
         state = .gameOver
+        
+        sushiBasePiece.removeFromParent()
+        
+        var n: CGFloat = 0
+        //loop through the shushi pieces in the array 55 times which is height of array
+        for piece in sushiTower {
+            print(n)
+            //Instead of moving directly we move 50% of the distance
+            let y = (n * 55) + 105
+            piece.position.y -= (piece.position.y - y) * 0.5
+            n += 1
+        }
         
         //Turn all the sushi peices red
         for sushi in sushiTower {
