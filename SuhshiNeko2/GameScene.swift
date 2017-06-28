@@ -35,6 +35,10 @@ class GameScene: SKScene {
     var healthBar: SKSpriteNode!
     //ScoreLabel
     var scoreLabel: SKLabelNode!
+    //GameOver text
+    var gameText: SKLabelNode!
+    var overText: SKLabelNode!
+    var playAgain: SKLabelNode!
     
     var health: CGFloat = 1.0 {
         didSet {
@@ -63,6 +67,9 @@ class GameScene: SKScene {
         //UI connections
         playButton = self.childNode(withName: "buttonPlay") as! MSButtonNode
         scoreLabel = self.childNode(withName: "scoreLabel") as! SKLabelNode
+        gameText = self.childNode(withName: "gameText") as! SKLabelNode
+        overText = self.childNode(withName: "overText") as! SKLabelNode
+        playAgain = self.childNode(withName: "playAgain") as! SKLabelNode
         
         state = .ready
         
@@ -71,6 +78,11 @@ class GameScene: SKScene {
         addTowerPiece(side: .none)
         addTowerPiece(side: .right)
         addRandomPieces(total: 10)
+        
+        //Hide Text
+        gameText.alpha = 0
+        overText.alpha = 0
+        playAgain.alpha = 0
         
     }
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
@@ -124,15 +136,26 @@ class GameScene: SKScene {
     
     override func update(_ currentTime: TimeInterval) {
         // Called before each frame is rendered
+        
+        //Sneak in the game over text
+        if state == .gameOver && gameText.alpha != 1 {
+            gameText.alpha += 0.05
+            overText.alpha += 0.05
+            playAgain.alpha += 0.05
+        }
+        
         if state != .playing {
             return
         }
         //Decrease health
         health -= 0.01
+        
         //has the player ran out of health
         if health < 0 {
             gameOver()
         }
+        
+        //Ease in the
         moveTowerDown()
     }
     

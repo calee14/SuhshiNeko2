@@ -32,6 +32,7 @@ class SushiPiece: SKSpriteNode {
             }
         }
     }
+    
     func connectChopsticks() {
         //Connect our child chopstick nodes
         rightChopstick = childNode(withName: "rightChopstick") as! SKSpriteNode
